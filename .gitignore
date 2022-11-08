@@ -2,4 +2,4 @@
 **/*.pyc
 venv
 
-testing.py
+test.py

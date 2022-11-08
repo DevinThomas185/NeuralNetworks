@@ -2,7 +2,7 @@ import numpy as np
 import pickle
 
 
-def xavier_init(size, gain = 1.0):
+def xavier_init(size, gain=1.0):
     """
     Xavier initialization of network weights.
 
@@ -120,6 +120,7 @@ class SigmoidLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+
         pass
 
         #######################################################################
@@ -143,6 +144,7 @@ class SigmoidLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+
         pass
 
         #######################################################################
@@ -223,14 +225,17 @@ class LinearLayer(Layer):
         self.n_in = n_in
         self.n_out = n_out
 
+        #######################################################################
+        #                       ** START OF YOUR CODE **
+        #######################################################################
+
         self._W = xavier_init((n_in, n_out))
-        self._b = np.zeros((1, n_out))
+        self._b = np.zeros((n_out,))
 
         # Cache current stores current input
         self._cache_current = None
-        self._grad_W_current = None
-        self._grad_b_current = None
-    
+        self._grad_W_current = np.empty((n_in, n_out))
+        self._grad_b_current = np.empty((n_out,))
 
     def forward(self, x):
         """
@@ -245,9 +250,9 @@ class LinearLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        batch_size = np.shape(x)[0]
-        self._cache_current = x
-        return x @ self._W + np.repeat(self._b, repeats=batch_size, axis=0)
+
+        self._cache_current = x.transpose()
+        return x @ self._W + self._b
 
     def backward(self, grad_z):
         """
@@ -263,12 +268,11 @@ class LinearLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        self._grad_W_current = np.transpose(self._cache_current) @ grad_z
-        ones_dim = np.shape(grad_z)[0]
-        self._grad_b_current = np.ones((1, ones_dim)) @ grad_z
+
+        self._grad_W_current = self._cache_current @ grad_z
+        ones_dim = grad_z.shape[0]
+        self._grad_b_current = np.ravel(np.ones((1, ones_dim)) @ grad_z)
         return grad_z @ np.transpose(self._W)
-
-
 
     def update_params(self, learning_rate):
         """
@@ -280,6 +284,8 @@ class LinearLayer(Layer):
         """
         self._W -= learning_rate * self._grad_W_current
         self._b -= learning_rate * self._grad_b_current
+
+        return
 
 
 class MultiLayerNetwork(object):
@@ -327,7 +333,7 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        return np.zeros((1, self.neurons[-1])) # Replace with your own code
+        return np.zeros((1, self.neurons[-1]))  # Replace with your own code
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -497,7 +503,7 @@ class Trainer(object):
                 (#_evaluation_data_points, n_features).
             - target_dataset {np.ndarray} -- Array of corresponding targets, of
                 shape (#_evaluation_data_points, #output_neurons).
-        
+
         Returns:
             a scalar value -- the loss
         """
@@ -529,7 +535,11 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+
+        # for means of features
+        self.min = data.min(axis=0)
+        # for SDs of features
+        self.max = data.max(axis=0)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -548,7 +558,8 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+
+        return (data - self.min) / (self.max - self.min)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -567,7 +578,8 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+
+        return data * (self.max - self.min) + self.min
 
         #######################################################################
         #                       ** END OF YOUR CODE **

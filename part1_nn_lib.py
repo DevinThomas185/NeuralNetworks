@@ -117,15 +117,10 @@ class SigmoidLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
 
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        # Formula: 1.0/(1.0 + np.exp(-x))
+        self._cache_current = x
+        return np.reciprocal(1 + np.exp(-x))
 
     def backward(self, grad_z):
         """
@@ -141,15 +136,10 @@ class SigmoidLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
 
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        # Formula: forward(x)*(1.0-forward(x))
+        sigmoid = np.reciprocal(1 + np.exp(-self._cache_current))
+        return grad_z * sigmoid * (1 - sigmoid)
 
 
 class ReluLayer(Layer):
@@ -176,14 +166,10 @@ class ReluLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        self._cache_current = x
+        relu = np.maximum(0, x)
+        return relu
 
     def backward(self, grad_z):
         """
@@ -199,14 +185,16 @@ class ReluLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        # Method 1
+        # y = self._cache_current
+        # relu = np.array(grad_z, copy=True)
+        # relu[y <= 0] = 0
+        # return relu
+
+        # Method 2 - better?
+        y = self._cache_current
+        return grad_z * (y > 0).astype(float)
 
 
 class LinearLayer(Layer):
@@ -225,14 +213,10 @@ class LinearLayer(Layer):
         self.n_in = n_in
         self.n_out = n_out
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-
         self._W = xavier_init((n_in, n_out))
         self._b = np.zeros((n_out,))
 
-        # Cache current stores current input
+        # Cache current stores current input transposed
         self._cache_current = None
         self._grad_W_current = np.empty((n_in, n_out))
         self._grad_b_current = np.empty((n_out,))
@@ -268,11 +252,13 @@ class LinearLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
+        if self._cache_current is None:
+            raise Exception("No forward pass completed on model yet")
 
         self._grad_W_current = self._cache_current @ grad_z
         ones_dim = grad_z.shape[0]
-        self._grad_b_current = np.ravel(np.ones((1, ones_dim)) @ grad_z)
-        return grad_z @ np.transpose(self._W)
+        self._grad_b_current = np.ones((ones_dim,)) @ grad_z
+        return grad_z @ self._W.transpose()
 
     def update_params(self, learning_rate):
         """
@@ -284,8 +270,6 @@ class LinearLayer(Layer):
         """
         self._W -= learning_rate * self._grad_W_current
         self._b -= learning_rate * self._grad_b_current
-
-        return
 
 
 class MultiLayerNetwork(object):
@@ -532,18 +516,11 @@ class Preprocessor(object):
             data {np.ndarray} dataset used to determine the parameters for
             the normalization.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
 
-        # for means of features
+        # For means of features
         self.min = data.min(axis=0)
-        # for SDs of features
+        # For SDs of features
         self.max = data.max(axis=0)
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def apply(self, data):
         """
@@ -555,15 +532,8 @@ class Preprocessor(object):
         Returns:
             {np.ndarray} normalized dataset.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
 
         return (data - self.min) / (self.max - self.min)
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def revert(self, data):
         """
@@ -575,15 +545,7 @@ class Preprocessor(object):
         Returns:
             {np.ndarray} reverted dataset.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-
         return data * (self.max - self.min) + self.min
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
 
 def example_main():

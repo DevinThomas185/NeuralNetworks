@@ -264,7 +264,8 @@ class LinearLayer(Layer):
                 input, of shape (batch_size, n_in).
         """
         self._grad_W_current = np.transpose(self._cache_current) * grad_z
-        self._grad_b_current = np.transpose(np.ones()) * grad_z
+        ones_dim = np.shape(grad_z)[0]
+        self._grad_b_current = np.ones((1, )) * grad_z
         return grad_z * np.transpose(self._W)
 
 

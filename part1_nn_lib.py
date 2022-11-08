@@ -223,19 +223,13 @@ class LinearLayer(Layer):
         self.n_in = n_in
         self.n_out = n_out
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        self._W = None
-        self._b = None
+        self._W = xavier_init((n_in, n_out))
+        self._b = np.zeros((1, n_out))
 
         self._cache_current = None
         self._grad_W_current = None
         self._grad_b_current = None
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+    
 
     def forward(self, x):
         """
@@ -250,14 +244,8 @@ class LinearLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        batch_size = np.shape(x)[0]
+        return x @ self._W + np.repeat(self._b, repeats=batch_size, axis=0)
 
     def backward(self, grad_z):
         """
@@ -273,14 +261,10 @@ class LinearLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
+        self._grad_W_current = (1 / m) * grad_z
+        self._grad_b_current = (1 / m) * np.sum(grad_z, axis=1, keepdims=True)
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        return 1
 
     def update_params(self, learning_rate):
         """
@@ -290,14 +274,8 @@ class LinearLayer(Layer):
         Arguments:
             learning_rate {float} -- Learning rate of update step.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        self._W -= learning_rate * self._grad_W_current
+        self._b -= learning_rate * self._grad_b_current
 
 
 class MultiLayerNetwork(object):
@@ -313,8 +291,8 @@ class MultiLayerNetwork(object):
         Arguments:
             - input_dim {int} -- Number of features in the input (excluding 
                 the batch dimension).
-            - neurons {list} -- Number of neurons in each linear layer 
-                represented as a list. The length of the list determines the 
+            - neurons {list} -- Number of neurons in each linear layer 
+                represented as a list. The length of the list determines the 
                 number of linear layers.
             - activations {list} -- List of the activation functions to apply 
                 to the output of each linear layer.

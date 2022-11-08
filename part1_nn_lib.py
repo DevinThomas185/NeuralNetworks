@@ -65,7 +65,7 @@ class MSELossLayer(Layer):
 
 class CrossEntropyLossLayer(Layer):
     """
-    CrossEntropyLossLayer: Computes the softmax followed by the negative 
+    CrossEntropyLossLayer: Computes the softmax followed by the negative
     log-likelihood loss.
     """
 
@@ -99,13 +99,13 @@ class SigmoidLayer(Layer):
     """
 
     def __init__(self):
-        """ 
+        """
         Constructor of the Sigmoid layer.
         """
         self._cache_current = None
 
     def forward(self, x):
-        """ 
+        """
         Performs forward pass through the Sigmoid layer.
 
         Logs information needed to compute gradient at a later stage in
@@ -164,7 +164,7 @@ class ReluLayer(Layer):
         self._cache_current = None
 
     def forward(self, x):
-        """ 
+        """
         Performs forward pass through the Relu layer.
 
         Logs information needed to compute gradient at a later stage in
@@ -232,7 +232,7 @@ class LinearLayer(Layer):
         self._W = xavier_init((n_in, n_out))
         self._b = np.zeros((n_out,))
 
-        # Cache current stores current input
+        # Cache current stores current input transposed
         self._cache_current = None
         self._grad_W_current = np.empty((n_in, n_out))
         self._grad_b_current = np.empty((n_out,))
@@ -268,11 +268,13 @@ class LinearLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
+        if self._cache_current is None:
+            raise Exception("No forward pass completed on model yet")
 
         self._grad_W_current = self._cache_current @ grad_z
         ones_dim = grad_z.shape[0]
-        self._grad_b_current = np.ravel(np.ones((1, ones_dim)) @ grad_z)
-        return grad_z @ np.transpose(self._W)
+        self._grad_b_current = np.ones((ones_dim,)) @ grad_z
+        return grad_z @ self._W.transpose()
 
     def update_params(self, learning_rate):
         """
@@ -284,8 +286,6 @@ class LinearLayer(Layer):
         """
         self._W -= learning_rate * self._grad_W_current
         self._b -= learning_rate * self._grad_b_current
-
-        return
 
 
 class MultiLayerNetwork(object):
@@ -299,12 +299,12 @@ class MultiLayerNetwork(object):
         Constructor of the multi layer network.
 
         Arguments:
-            - input_dim {int} -- Number of features in the input (excluding 
+            - input_dim {int} -- Number of features in the input (excluding
                 the batch dimension).
-            - neurons {list} -- Number of neurons in each linear layer 
-                represented as a list. The length of the list determines the 
+            - neurons {list} -- Number of neurons in each linear layer
+                represented as a list. The length of the list determines the
                 number of linear layers.
-            - activations {list} -- List of the activation functions to apply 
+            - activations {list} -- List of the activation functions to apply
                 to the output of each linear layer.
         """
         self.input_dim = input_dim
@@ -451,7 +451,7 @@ class Trainer(object):
             - target_dataset {np.ndarray} -- Array of corresponding targets, of
                 shape (#_data_points, #output_neurons).
 
-        Returns: 
+        Returns:
             - {np.ndarray} -- shuffled inputs.
             - {np.ndarray} -- shuffled_targets.
         """
@@ -532,18 +532,10 @@ class Preprocessor(object):
             data {np.ndarray} dataset used to determine the parameters for
             the normalization.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-
-        # for means of features
+        # For means of features
         self.min = data.min(axis=0)
-        # for SDs of features
+        # For SDs of features
         self.max = data.max(axis=0)
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def apply(self, data):
         """
@@ -555,15 +547,7 @@ class Preprocessor(object):
         Returns:
             {np.ndarray} normalized dataset.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-
         return (data - self.min) / (self.max - self.min)
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def revert(self, data):
         """
@@ -575,15 +559,7 @@ class Preprocessor(object):
         Returns:
             {np.ndarray} reverted dataset.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-
         return data * (self.max - self.min) + self.min
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
 
 def example_main():

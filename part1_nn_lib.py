@@ -226,6 +226,7 @@ class LinearLayer(Layer):
         self._W = xavier_init((n_in, n_out))
         self._b = np.zeros((1, n_out))
 
+        # Cache current stores current input
         self._cache_current = None
         self._grad_W_current = None
         self._grad_b_current = None
@@ -245,6 +246,7 @@ class LinearLayer(Layer):
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
         batch_size = np.shape(x)[0]
+        self._cache_current = x
         return x @ self._W + np.repeat(self._b, repeats=batch_size, axis=0)
 
     def backward(self, grad_z):
@@ -261,10 +263,11 @@ class LinearLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        self._grad_W_current = (1 / m) * grad_z
-        self._grad_b_current = (1 / m) * np.sum(grad_z, axis=1, keepdims=True)
+        self._grad_W_current = np.transpose(self._cache_current) * grad_z
+        self._grad_b_current = np.transpose(np.ones()) * grad_z
+        return grad_z * np.transpose(self._W)
 
-        return 1
+
 
     def update_params(self, learning_rate):
         """

@@ -294,14 +294,17 @@ class MultiLayerNetwork(object):
         self.input_dim = input_dim
         self.neurons = neurons
         self.activations = activations
+        self._layers: list[Layer] = []
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        self._layers = None
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        neurons.insert(0, input_dim)
+        assert len(activations) + 1 == len(neurons)
+        for i in range(len(activations)):
+            self._layers.append(LinearLayer(neurons[i], neurons[i + 1]))
+            act = activations[i]
+            if act == "relu":
+                self._layers.append(ReluLayer())
+            elif act == "sigmoid":
+                self._layers.append(SigmoidLayer())
 
     def forward(self, x):
         """
@@ -314,14 +317,11 @@ class MultiLayerNetwork(object):
             {np.ndarray} -- Output array of shape (batch_size,
                 #_neurons_in_final_layer)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        return np.zeros((1, self.neurons[-1]))  # Replace with your own code
+        out = x
+        for layer in self._layers:
+            out = layer.forward(out)
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        return out
 
     def __call__(self, x):
         return self.forward(x)
@@ -338,14 +338,10 @@ class MultiLayerNetwork(object):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, input_dim).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
+        for layer in self._layers[::-1]:
+            grad_z = layer.backward(grad_z)
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        return grad_z
 
     def update_params(self, learning_rate):
         """
@@ -355,14 +351,9 @@ class MultiLayerNetwork(object):
         Arguments:
             learning_rate {float} -- Learning rate of update step.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        for layer in self._layers:
+            if isinstance(layer, LinearLayer):
+                layer.update_params(learning_rate)
 
 
 def save_network(network, fpath):
@@ -409,20 +400,17 @@ class Trainer(object):
             - shuffle_flag {bool} -- If True, training data is shuffled before
                 training.
         """
-        self.network = network
+        self.network: MultiLayerNetwork = network
         self.batch_size = batch_size
         self.nb_epoch = nb_epoch
         self.learning_rate = learning_rate
         self.loss_fun = loss_fun
         self.shuffle_flag = shuffle_flag
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        self._loss_layer = None
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        if loss_fun == "cross_entropy":
+            self._loss_layer = CrossEntropyLossLayer()
+        elif loss_fun == "mse":
+            self._loss_layer = MSELossLayer()
 
     @staticmethod
     def shuffle(input_dataset, target_dataset):
@@ -439,14 +427,9 @@ class Trainer(object):
             - {np.ndarray} -- shuffled inputs.
             - {np.ndarray} -- shuffled_targets.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        assert len(input_dataset) == len(target_dataset)
+        p = np.random.permutation(len(input_dataset))
+        return input_dataset[p], target_dataset[p]
 
     def train(self, input_dataset, target_dataset):
         """
@@ -468,14 +451,26 @@ class Trainer(object):
             - target_dataset {np.ndarray} -- Array of corresponding targets, of
                 shape (#_training_data_points, #output_neurons).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        for i in range(self.nb_epoch):
+            inputs = input_dataset
+            targets = target_dataset
+            if self.shuffle_flag:
+                inputs, targets = self.shuffle(
+                    input_dataset=input_dataset,
+                    target_dataset=target_dataset,
+                )
+            # Split into batches
+            number_of_batches = len(inputs) / self.batch_size
+            batches = zip(
+                np.split(inputs, number_of_batches),
+                np.split(targets, number_of_batches),
+            )
+            for train, target in batches:
+                predicted = self.network.forward(train)
+                loss = self.eval_loss(train, target)
+                grad_z = self._loss_layer.backward()
+                self.network.backward(grad_z=grad_z)
+                self.network.update_params(learning_rate=self.learning_rate)
 
     def eval_loss(self, input_dataset, target_dataset):
         """
@@ -491,14 +486,9 @@ class Trainer(object):
         Returns:
             a scalar value -- the loss
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        return self._loss_layer.forward(
+            self.network.forward(input_dataset), target_dataset
+        )
 
 
 class Preprocessor(object):

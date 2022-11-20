@@ -2,6 +2,7 @@ import torch
 import pickle
 import numpy as np
 import pandas as pd
+from sklearn import preprocessing
 
 class Regressor():
 
@@ -24,10 +25,11 @@ class Regressor():
         #######################################################################
 
         # Replace this code with your own
-        X, _ = self._preprocessor(x, training = True)
-        self.input_size = X.shape[1]
-        self.output_size = 1
-        self.nb_epoch = nb_epoch
+        #X, _ = self._preprocessor(x, training = True)
+        self._preprocessor(x, training = True)
+        #self.input_size = X.shape[1]
+        #self.output_size = 1
+        #self.nb_epoch = nb_epoch
         return
 
         #######################################################################
@@ -57,10 +59,7 @@ class Regressor():
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        # Replace this code with your own
-        # Return preprocessed x and y, return None for y if it was None
-
-        # Steps according to the spece:
+        # Steps according to the spec:
 
         # Store parameters used for preprocessing to be able to apply the same
         # process to all inputs of the model
@@ -72,12 +71,47 @@ class Regressor():
         # values. IMPORTANT
 
         # Handle the missing values in the data using Pandas fillna function.
+        # Idea: since all values have some real-live meaning, I was thinking about
+        # replacing missing values with the average of all values for that feature.
 
         # Handle the textual values in the data using Sklearn LabelBinarizer
 
         # Normalise the numerical values to improve learning.
 
-        X = torch.tensor(x)
+        #######################################################################
+
+        x_numerical = x.loc[:, x.columns != "ocean_proximity"]
+
+        if training:
+            #Recompute the processing values if training
+            self.numerical_means = x_numerical.mean()
+            # Adding a sane default for ocean proximity
+            self.standard_deviations = x_numerical.std()
+            # We also want to fit the encoder only when training
+            self.one_hot_encoder = preprocessing.OneHotEncoder(handle_unknown="ignore")
+            self.one_hot_encoder.fit(x[["ocean_proximity"]])
+
+
+        # Fills in all NaNs with our previously computed means.
+        fill_mask = self.numerical_means.copy()
+        # Fill in a sane default for missing ocean_proximity entries."
+        fill_mask["ocean_proximity"] = "INLAND"
+        x = x.fillna(value=fill_mask)
+
+
+        # Transform the ocean_proximity column into the one-hot encoded columns.
+        one_hot_dataframe = pd.DataFrame(self.one_hot_encoder.transform(x[["ocean_proximity"]]).toarray())
+
+        # Normalise the data using the previously computed means.
+        x_normalised = (x_numerical - self.numerical_means)/self.standard_deviations
+
+
+        # Append the one-hot encoded columns for the ocean_proximity to the end.
+        x = x_normalised.join(one_hot_dataframe)
+
+        X = torch.Tensor(np.array(x))
+
+        # Do we also want to pre-process y somehow?
         Y = (torch.tensor(y) if isinstance(y, pd.DataFrame) else None)
         print(X)
         print(Y)
@@ -230,12 +264,12 @@ def example_main():
     # You probably want to separate some held-out data
     # to make sure the model isn't overfitting
     regressor = Regressor(x_train, nb_epoch = 10)
-    regressor.fit(x_train, y_train)
-    save_regressor(regressor)
+    #regressor.fit(x_train, y_train)
+    #save_regressor(regressor)
 
     # Error
-    error = regressor.score(x_train, y_train)
-    print("\nRegressor error: {}\n".format(error))
+    #error = regressor.score(x_train, y_train)
+    #print("\nRegressor error: {}\n".format(error))
 
 
 if __name__ == "__main__":

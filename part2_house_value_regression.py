@@ -29,10 +29,11 @@ class Regressor:
         self,
         x,
         nb_epoch=1000,
+        learning_rate=0.001,
         normalisation_method=NormMethod.MIN_MAX,
-        loss_function=Loss.CROSS_ENTROPY,
+        loss_function=Loss.MEAN_SQUARE_ERROR,
         batch_size=64,
-        plot_loss=False,
+        plot_loss=True,
     ):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
@@ -52,6 +53,7 @@ class Regressor:
         #######################################################################
 
         # Replace this code with your own
+        self.__learning_rate = learning_rate
         self.__normalisation_method = normalisation_method
         self.__loss_function = loss_function
         self.__device = "cuda" if T.cuda.is_available() else "cpu"
@@ -60,9 +62,13 @@ class Regressor:
 
         self.__training_columns = None
         self.__x_mean = None
+        self.__y_mean = None
         self.__x_std = None
+        self.__y_std = None
         self.__x_min = None
+        self.__y_min = None
         self.__x_max = None
+        self.__y_max = None
 
         X, _ = self._preprocessor(x, training=True)
         self.input_size = X.shape[1]
@@ -88,9 +94,6 @@ class Regressor:
 
         return
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def _preprocessor(self, x, y=None, training=False):
         """
@@ -133,18 +136,27 @@ class Regressor:
 
         # When training we initialise our normalisation values
         if training:
-            # For Z-Score Normalisation
             self.__x_mean = x.mean()
             self.__x_std = x.std()
-
-            # For Min-Max Normalisation
             self.__x_min = x.min()
             self.__x_max = x.max()
+            if y is not None:
+                self.__y_mean = y.mean()
+                self.__y_std = y.std()
+                self.__y_min = y.min()
+                self.__y_max = y.max()
 
+
+        # For Z-Score Normalisation
         if self.__normalisation_method == NormMethod.Z_SCORE:
-            x = (x - self.__x_mean) / self.__x_std
+                x = (x - self.__x_mean) / self.__x_std
+                if y is not None:
+                    y = (y - self.__y_mean) / self.__y_std
+        # For Min-Max Normalisation
         elif self.__normalisation_method == NormMethod.MIN_MAX:
-            x = (x - self.__x_min) / (self.__x_max - self.__x_min)
+                x = (x - self.__x_min) / (self.__x_max - self.__x_min)
+                if y is not None:
+                    y = (y - self.__y_min) / (self.__y_max - self.__y_min)
 
         # Putting the columns correct for the test dataset, or setting them for the training
         if training:
@@ -190,7 +202,7 @@ class Regressor:
         permutation = T.randperm(X.shape[0])
         loss_by_epoch = []
 
-        optimiser = T.optim.Adam(self.__network.parameters(), lr=0.001)
+        optimiser = T.optim.Adam(self.__network.parameters(), lr=self.__learning_rate)
 
         for i in range(self.nb_epoch):
 
@@ -203,7 +215,7 @@ class Regressor:
                 # Forward
                 Y_Pred = self.__network(data)
 
-                print(
+                """print(
                     "Data:\t",
                     int(data_y.mean().item()),
                     "\t\t",
@@ -212,11 +224,11 @@ class Regressor:
                     "\t\t",
                     "Delta:\t",
                     int(data_y.mean().item()) - int(Y_Pred.mean().item()),
-                )
+                )"""
                 # Loss
                 loss = self.__loss_function.value(Y_Pred, data_y)
 
-                current_loss += loss.item()
+                current_loss += loss.item() / self.__batch_size
 
                 # Backward
                 loss.backward()
@@ -312,16 +324,37 @@ def RegressorHyperParameterSearch():
         The function should return your optimised hyper-parameters.
 
     """
+    best_learning_rate = 0
+    lowest_error = 10000000000
 
-    #######################################################################
-    #                       ** START OF YOUR CODE **
-    #######################################################################
+    output_label = "median_house_value"
+    data = pd.read_csv("housing.csv")
+    total_samples = len(data)
+    train_fraction = 0.8
+    si = train_fraction * total_samples
 
-    return  # Return the chosen hyper parameters
+    x_train = data.loc[:si, data.columns != output_label]
+    y_train = data.loc[:si, [output_label]]
+    x_test = data.loc[si:, data.columns != output_label]
+    y_test = data.loc[si:, [output_label]]
 
-    #######################################################################
-    #                       ** END OF YOUR CODE **
-    #######################################################################
+    for i in np.arange(0.01, 0.1, 0.01):
+        regressor = Regressor(x_train, nb_epoch=10, learning_rate=i)
+        regressor.fit(x_train, y_train)
+        save_regressor(regressor)
+
+        # Error
+        error = regressor.score(x_train, y_train)
+        print("\nTrain Regressor error: {}\n".format(error))
+
+        error_test = regressor.score(x_test, y_test)
+        print("\nTest Regressor error: {}\n".format(error_test))
+
+        if error < lowest_error:
+            best_learning_rate = i
+            lowest_error = error
+
+    print(best_learning_rate)
 
 
 def example_main():
@@ -347,7 +380,7 @@ def example_main():
     # This example trains on the whole available dataset.
     # You probably want to separate some held-out data
     # to make sure the model isn't overfitting
-    regressor = Regressor(x_train, nb_epoch=10)
+    regressor = Regressor(x_train, nb_epoch=1)
     regressor.fit(x_train, y_train)
     save_regressor(regressor)
 
@@ -357,6 +390,9 @@ def example_main():
 
     error_test = regressor.score(x_test, y_test)
     print("\nTest Regressor error: {}\n".format(error_test))
+
+    RegressorHyperParameterSearch()
+
 
 
 if __name__ == "__main__":

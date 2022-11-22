@@ -401,6 +401,9 @@ def example_main():
 
     # RegressorHyperParameterSearch(params)
 
+    model = load_regressor()
+    print(model.nb_epoch)
+
 
 if __name__ == "__main__":
     example_main()

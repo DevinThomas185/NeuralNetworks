@@ -28,6 +28,7 @@ class Regressor:
     def __init__(
         self,
         x,
+        validation=False,
         nb_epoch=100,
         learning_rate=0.1,
         neurons=[5, 5],
@@ -69,6 +70,7 @@ class Regressor:
         self.__label_replace = None
         self.__x_imputer = impute.SimpleImputer(missing_values=np.nan, strategy="mean")
         self.__x_scaling = preprocessing.MinMaxScaler()
+        self.__validation = validation
 
         X, _ = self._preprocessor(x, training=True)
         self.input_size = X.shape[1]
@@ -147,7 +149,7 @@ class Regressor:
 
         return x, y
 
-    def fit(self, x, y):
+    def fit(self, x, y, validation_x = None, validation_y = None):
         """
         Regressor training function
 
@@ -160,6 +162,10 @@ class Regressor:
             self {Regressor} -- Trained model.
 
         """
+        if (validation_x is None or validation_y is None) and self.__validation:
+            print("No validation dataset provided, switching to no validation")
+            self.__validation = False
+
         X, Y = self._preprocessor(x, y=y, training=True)  # Do not forget
         data_batch = T.utils.data.TensorDataset(X, Y)
         trainloader = T.utils.data.DataLoader(
@@ -170,11 +176,14 @@ class Regressor:
 
         permutation = T.randperm(X.shape[0])
         loss_by_epoch = []
+        val_loss_by_epoch = []
 
         optimiser = T.optim.Adam(self.__network.parameters(), lr=self.learning_rate)
         
-        for i in range(self.nb_epoch):
+        min_val_loss = 0
 
+        for i in range(self.nb_epoch):
+            
             running_loss = 0
             last_loss = 0
 
@@ -214,18 +223,39 @@ class Regressor:
 
             last_loss = running_loss / len(trainloader)
 
+            # Early stop depending on if validation loss increases
+            if self.__validation:
+                validation_loss = self.score(validation_x, validation_y)
+                val_loss_by_epoch.append(validation_loss)
+                # Initialise min_val_loss properly
+                if i == 0:
+                    min_val_loss = validation_loss
+                    
             if self.__plot_loss:
-                print(f"Epoch {i+1}/{self.nb_epoch}, Train Loss: {last_loss:.4f}")
+                if self.__validation:
+                    print(f"Epoch {i+1}/{self.nb_epoch}, Train Loss: {last_loss:.4f}, Validation Loss: {validation_loss:.4f}")
+                else:
+                    print(f"Epoch {i+1}/{self.nb_epoch}, Train Loss: {last_loss:.4f}")
+
             loss_by_epoch.append(last_loss)
 
-        self.x_axis = range(1, self.nb_epoch+1)
+            if self.__validation:
+                if validation_loss <= min_val_loss:
+                    min_val_loss = validation_loss
+                else:
+                    break
+
+        self.x_axis = range(1, i+2)
         self.y_axis = loss_by_epoch
 
         if self.__plot_loss:            
-            plt.plot(self.x_axis, self.y_axis)
+            plt.plot(self.x_axis, self.y_axis, label="Training Loss")
+            if self.__validation:
+                plt.plot(self.x_axis, val_loss_by_epoch, label="Validation Loss")
             plt.title("Loss by Epoch")
             plt.xlabel("Epoch")
             plt.ylabel("Loss")
+            plt.legend()
             plt.vlines(get_elbow_value(self), plt.ylim()[0], plt.ylim()[1], linestyles='dashed')
             plt.show()
 
@@ -323,16 +353,23 @@ def RegressorHyperParameterSearch(params):
     from tune_sklearn import TuneGridSearchCV
 
     x, y = read_dataset("housing.csv", "median_house_value")
-    X_train, X_test, y_train, y_test = train_test_split(
+    X_VT, X_test, y_VT, y_test = train_test_split(
         x, y,
         random_state=104, 
-        test_size=0.25, 
+        test_size=1/10, 
+        shuffle=True
+    )
+
+    X_train, X_validation, y_train, y_validation = train_test_split(
+        X_VT, y_VT,
+        random_state=104, 
+        test_size=1/9, 
         shuffle=True
     )
     
-    grid_search = TuneGridSearchCV(
-    # grid_search = GridSearchCV(
-        Regressor(x=X_train),
+    # grid_search = TuneGridSearchCV(
+    grid_search = GridSearchCV(
+        Regressor(x=X_train, validation=True),
         param_grid=params,
         scoring="neg_root_mean_squared_error",
         n_jobs=-1,
@@ -341,7 +378,7 @@ def RegressorHyperParameterSearch(params):
         # use_gpu=True,
     )
     
-    grid_search.fit(X_train, y_train)
+    grid_search.fit(X_train, y_train, validation_x=X_validation, validation_y=y_validation)
 
     print("Best params:", grid_search.best_params_)
     print("Elbow Epoch:", get_elbow_value(grid_search.best_estimator_))
@@ -357,39 +394,36 @@ def read_dataset(path, output_label):
 
 def example_main():
 
-    output_label = "median_house_value"
+    x, y = read_dataset("housing.csv", "median_house_value")
 
-    # Use pandas to read CSV data as it contains various object types
-    # Feel free to use another CSV reader tool
-    # But remember that LabTS tests take Pandas DataFrame as inputs
-    data = pd.read_csv("housing.csv")
+    X_VT, X_test, y_VT, y_test = train_test_split(
+        x, y,
+        random_state=104, 
+        test_size=1/10, 
+        shuffle=True
+    )
 
-    total_samples = len(data)
-    train_fraction = 0.8
-    si = train_fraction * total_samples
-
-    # Splitting input and output
-    x_train = data.loc[:si, data.columns != output_label]
-    y_train = data.loc[:si, [output_label]]
-    x_test = data.loc[si:, data.columns != output_label]
-    y_test = data.loc[si:, [output_label]]
+    X_train, X_validation, y_train, y_validation = train_test_split(
+        X_VT, y_VT,
+        random_state=104, 
+        test_size=1/9, 
+        shuffle=True
+    )
+    
 
     # Training
     # This example trains on the whole available dataset.
     # You probably want to separate some held-out data
     # to make sure the model isn't overfitting
-    regressor = Regressor(x_train, plot_loss=True)
-    regressor.fit(x_train, y_train)
+    regressor = Regressor(X_train, plot_loss=True, validation=True)
+    regressor.fit(X_train, y_train, validation_x=X_validation, validation_y=y_validation)
     save_regressor(regressor)
 
     print("Optimal Epochs:", get_elbow_value(regressor))
 
     # Error
     import math
-    error = math.sqrt(regressor.score(x_train, y_train))
-    print("Train Regressor error: {}".format(error))
-
-    error_test = math.sqrt(regressor.score(x_test, y_test))
+    error_test = math.sqrt(regressor.score(X_test, y_test))
     print("Test Regressor error: {}".format(error_test))
 
 

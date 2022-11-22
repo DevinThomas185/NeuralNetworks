@@ -28,11 +28,11 @@ class Regressor:
     def __init__(
         self,
         x,
-        nb_epoch=1000,
-        learning_rate=0.001,
-        neurons=[8,8,8],
+        nb_epoch=100,
+        learning_rate=0.1,
+        neurons=[5, 5],
         loss_function=nn.MSELoss(),
-        batch_size=1000,
+        batch_size=100,
         plot_loss=False,
     ):
         # You can add any input parameters you need
@@ -47,30 +47,34 @@ class Regressor:
             - nb_epoch {int} -- number of epochs to train the network.
 
         """
+        # Hyperparameters
+        self.learning_rate = learning_rate
+        self.batch_size = batch_size
+        self.nb_epoch = nb_epoch
+        self.neurons = neurons
 
         # Replace this code with your own
         self.__x = x
-        self.__learning_rate = learning_rate
         self.__loss_function = loss_function
         # self.__device = T.device("cpu") 
-        self.__device = T.device("cuda:0" if T.cuda.is_available() else "cpu")
-        T.cuda.set_device(self.__device)
-        self.__batch_size = batch_size
+        device_name = "cuda:0" if T.cuda.is_available() else "cpu"
+        self.__device = T.device(device_name)
+        
+        if device_name != "cpu":
+            T.cuda.set_device(self.__device)
+        
         self.__plot_loss = plot_loss
 
         self.__training_columns = None
         self.__label_replace = None
         self.__x_imputer = impute.SimpleImputer(missing_values=np.nan, strategy="mean")
         self.__x_scaling = preprocessing.MinMaxScaler()
-        self.__y_scaling = preprocessing.MinMaxScaler()
 
         X, _ = self._preprocessor(x, training=True)
         self.input_size = X.shape[1]
         self.output_size = 1
-        self.nb_epoch = nb_epoch
 
         # Network Initialisation
-        self.__neurons = neurons
         model = []
         n_input = self.input_size
         for layer in neurons:
@@ -113,6 +117,7 @@ class Regressor:
             self.__label_replace = x['ocean_proximity'].mode()[0]
                         
         # Transform the ocean_proximity column into the one-hot encoded columns.
+        pd.options.mode.chained_assignment = None  # default='warn'
         x["ocean_proximity"] = x.loc[:, ['ocean_proximity']].fillna(value=self.__label_replace)
         new_columns = pd.get_dummies(x["ocean_proximity"])
         x = x.drop("ocean_proximity", axis=1).join(new_columns)
@@ -129,8 +134,6 @@ class Regressor:
         x = self.__x_imputer.transform(x)
         if training:
             self.__x_scaling.fit(x)
-            if isinstance(y, pd.DataFrame):
-                self.__y_scaling.fit(y)
     
 
         # Set X and Y types
@@ -139,12 +142,12 @@ class Regressor:
             y = y.astype("float32")
         
         x = T.from_numpy(np.array(self.__x_scaling.transform(x))).to(self.__device)
-        y = T.from_numpy(np.array(self.__y_scaling.transform(y))).to(self.__device) if isinstance(y, pd.DataFrame) else None
+        y = T.from_numpy(np.array(y)).to(self.__device) if isinstance(y, pd.DataFrame) else None
         
 
         return x, y
 
-    def fit(self, x, y, dev_x=None, dev_y=None):
+    def fit(self, x, y):
         """
         Regressor training function
 
@@ -157,23 +160,23 @@ class Regressor:
             self {Regressor} -- Trained model.
 
         """
-
         X, Y = self._preprocessor(x, y=y, training=True)  # Do not forget
         data_batch = T.utils.data.TensorDataset(X, Y)
         trainloader = T.utils.data.DataLoader(
             data_batch,
-            batch_size=self.__batch_size,
+            batch_size=self.batch_size,
             shuffle=True,
         )
 
         permutation = T.randperm(X.shape[0])
         loss_by_epoch = []
 
-        optimiser = T.optim.Adam(self.__network.parameters(), lr=self.__learning_rate)
+        optimiser = T.optim.Adam(self.__network.parameters(), lr=self.learning_rate)
         
         for i in range(self.nb_epoch):
 
-            current_loss = 0
+            running_loss = 0
+            last_loss = 0
 
             for j, (data, data_y) in enumerate(trainloader):
                 data = data.to(self.__device)
@@ -201,7 +204,7 @@ class Regressor:
                 # Loss
                 loss = self.__loss_function(Y_Pred, data_y)
 
-                current_loss += loss.item()
+                running_loss += loss.item()
 
                 # Backward
                 loss.backward()
@@ -209,17 +212,21 @@ class Regressor:
                 # Gradient Step
                 optimiser.step()
 
-                # Print statistics
+            last_loss = running_loss / len(trainloader)
 
-            # print(f"Epoch {i+1}/{self.nb_epoch}, Train Loss: {current_loss:.4f}")
+            if self.__plot_loss:
+                print(f"Epoch {i+1}/{self.nb_epoch}, Train Loss: {last_loss:.4f}")
+            loss_by_epoch.append(last_loss)
 
-            loss_by_epoch.append(current_loss)
+        self.x_axis = range(1, self.nb_epoch+1)
+        self.y_axis = loss_by_epoch
 
-        if self.__plot_loss:
-            plt.plot(range(self.nb_epoch), loss_by_epoch)
+        if self.__plot_loss:            
+            plt.plot(self.x_axis, self.y_axis)
             plt.title("Loss by Epoch")
             plt.xlabel("Epoch")
             plt.ylabel("Loss")
+            plt.vlines(get_elbow_value(self), plt.ylim()[0], plt.ylim()[1], linestyles='dashed')
             plt.show()
 
         return self
@@ -264,16 +271,20 @@ class Regressor:
     def get_params(self, deep=True):
         return {
             'x': self.__x,
-            'learning_rate': self.__learning_rate,
+            'learning_rate': self.learning_rate,
             'nb_epoch': self.nb_epoch,
-            'neurons': self.__neurons,
-            'batch_size': self.__batch_size
+            'neurons': self.neurons,
+            'batch_size': self.batch_size
         }
 
     def set_params(self, **params):
         for p, v in params.items():
             setattr(self, p, v)
         return self
+
+def get_elbow_value(model):
+    from kneed import KneeLocator
+    return KneeLocator(model.x_axis, model.y_axis, S=1.0, curve='convex', direction='decreasing').knee
 
 def save_regressor(trained_model):
     """
@@ -312,27 +323,28 @@ def RegressorHyperParameterSearch(params):
     from tune_sklearn import TuneGridSearchCV
 
     x, y = read_dataset("housing.csv", "median_house_value")
-    X_train, X_test, y_train, y_test = train_test_split(x, y,
-                                random_state=104, 
-                                test_size=0.25, 
-                                shuffle=True)
-
-    # grid_search = TuneGridSearchCV(
-    grid_search = GridSearchCV(
-        Regressor(x=X_train, nb_epoch=10),
+    X_train, X_test, y_train, y_test = train_test_split(
+        x, y,
+        random_state=104, 
+        test_size=0.25, 
+        shuffle=True
+    )
+    
+    grid_search = TuneGridSearchCV(
+    # grid_search = GridSearchCV(
+        Regressor(x=X_train),
         param_grid=params,
         scoring="neg_root_mean_squared_error",
         n_jobs=-1,
-        verbose=2,
+        verbose=1,
         return_train_score=True,
         # use_gpu=True,
     )
     
-    grid_search.fit(X_train, y_train, dev_x=X_test, dev_y=y_test)
+    grid_search.fit(X_train, y_train)
 
     print("Best params:", grid_search.best_params_)
-
-    # analysis = tune.run(train, config={"lr": tune.grid_search([0.001, 0.01, 0.1])}, resources_per_trial={"cpu": 28, "gpu": 1})
+    print("Elbow Epoch:", get_elbow_value(grid_search.best_estimator_))
     # print("Best Config:", analysis.get_best_config(metric="mean_accuracy"))
 
 
@@ -366,26 +378,28 @@ def example_main():
     # This example trains on the whole available dataset.
     # You probably want to separate some held-out data
     # to make sure the model isn't overfitting
-    regressor = Regressor(x_train, nb_epoch=1)
+    regressor = Regressor(x_train, plot_loss=True)
     regressor.fit(x_train, y_train)
     save_regressor(regressor)
 
+    print("Optimal Epochs:", get_elbow_value(regressor))
+
     # Error
-    error = regressor.score(x_train, y_train)
+    import math
+    error = math.sqrt(regressor.score(x_train, y_train))
     print("Train Regressor error: {}".format(error))
 
-    error_test = regressor.score(x_test, y_test)
+    error_test = math.sqrt(regressor.score(x_test, y_test))
     print("Test Regressor error: {}".format(error_test))
 
 
     params = {
-        'learning_rate': [0.001, 0.005, 0.05, 0.1],
-        'batch_size': [64, 256, 512, 1024],
-        'neurons': [[13], [10, 10], [8, 8], [8, 8, 8], [13, 8], [9, 4], [13, 9, 4]]
+        'batch_size': [100, 1000],
+        'learning_rate': [0.01, 0.1],
+        'neurons': [[10], [13], [5, 5]],
     }
 
-    RegressorHyperParameterSearch(params)
-
+    # RegressorHyperParameterSearch(params)
 
 
 if __name__ == "__main__":

@@ -64,7 +64,7 @@ if __name__ == "__main__":
         "-n",
         "--neurons",
         nargs="+",
-        help="Provide the hidden layers neurons choices. Please separate choices with a , (e.g 5 5 , 10 10)",
+        help="Provide the hidden layers neurons choices. Please separate choices with a : (e.g 5 5 : 10 10)",
         default=None,
         type=str,
     )
@@ -113,12 +113,13 @@ if __name__ == "__main__":
         current = []
         print(args.neurons)
         for n in args.neurons:
-            if n != ",":
+            if n != ":":
                 current.append(int(n))
             else:
                 neurons.append(current)
                 current = []
         neurons.append(current)
+        print(neurons)
 
         params["neurons"] = neurons
 

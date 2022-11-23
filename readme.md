@@ -112,7 +112,7 @@ optional arguments:
   -d DROPOUT [DROPOUT ...], --dropout DROPOUT [DROPOUT ...]
                         Provide a list of fractions of neurons to drop in training
   -n NEURONS [NEURONS ...], --neurons NEURONS [NEURONS ...]
-                        Provide the hidden layers neurons choices. Please separate choices with a , (e.g 5 5 , 10 10)
+                        Provide the hidden layers neurons choices. Please separate choices with a , (e.g 5 5 : 10 10)
   -x SEED, --seed SEED  Provide a seed for shuffling the dataset
   -k FOLDS, --folds FOLDS
                         Provide the number of folds for cross validation
@@ -121,7 +121,7 @@ optional arguments:
 ### Example Use
 You can run:
 ```
-python3 hyperparameter_tuning.py housing.csv median_house_value -es -e 10 -lr 0.01 0.1 -b 100 -d 0.1 0.9 -n 5 5 , 10 10
+python3 hyperparameter_tuning.py housing.csv median_house_value -es -e 10 -lr 0.01 0.1 -b 100 -d 0.1 0.9 -n 5 5 : 10 10
 ```
 Explanation:
 - ```housing.csv``` run the regression neural network on **housing.csv** dataset
@@ -131,7 +131,7 @@ Explanation:
 - ```-lr 0.01 0.1``` set learning rate to [0.01, 0.1]
 - ```-b 100``` set batch-size to 100
 - ```-d 0.1``` set dropout value to 0.1
-- ```-n 5 5, 10 10``` set neurons to [5, 5], [10, 10]  
+- ```-n 5 5: 10 10``` set neurons to [5, 5], [10, 10]  
   
 ----
 ### Extras

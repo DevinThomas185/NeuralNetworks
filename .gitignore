@@ -3,3 +3,9 @@
 venv
 
 test.py
+
+testNetwork.py
+
+csvs.py
+housing2.csv
+tests.csv

@@ -14,6 +14,7 @@ DEFAULT_EPOCHS = 100
 DEFAULT_LEARNING_RATE = 0.01
 DEFAULT_NEURONS = [5, 5]
 DEFAULT_BATCH_SIZE = 100
+DEFAULT_EARLY_STOP_TOLERANCE = 5
 
 
 class Regressor:
@@ -22,6 +23,7 @@ class Regressor:
         x,
         validation=False,
         early_stop=False,
+        early_stop_tolerance=DEFAULT_EARLY_STOP_TOLERANCE,
         dropout=None,
         nb_epoch=DEFAULT_EPOCHS,
         learning_rate=DEFAULT_LEARNING_RATE,
@@ -47,6 +49,7 @@ class Regressor:
         self.nb_epoch = nb_epoch
         self.neurons = neurons
         self.early_stop = early_stop
+        self.early_stop_tolerance = early_stop_tolerance
         self.dropout = dropout
 
         self.__x = x
@@ -183,6 +186,8 @@ class Regressor:
 
         min_val_loss = 0
 
+        early_stop_count = 0
+
         for i in range(self.nb_epoch):
 
             running_loss = 0
@@ -248,7 +253,10 @@ class Regressor:
                     min_val_loss = validation_loss
                 else:
                     if self.early_stop:
-                        break
+                        early_stop_count += 1
+                        if early_stop_count >= self.early_stop_tolerance:
+                            break
+                    # pass
 
         self.x_axis = range(1, i + 2)
         self.y_axis = loss_by_epoch
@@ -419,6 +427,7 @@ def _run_neural_net(
     output_label,
     validation,
     early_stop,
+    early_stop_tolerance,
     nb_epoch,
     learning_rate,
     batch_size,
@@ -446,6 +455,7 @@ def _run_neural_net(
         plot_loss=plot_loss,
         validation=validation,
         early_stop=early_stop,
+        early_stop_tolerance=early_stop_tolerance,
         nb_epoch=nb_epoch,
         learning_rate=learning_rate,
         batch_size=batch_size,
@@ -497,6 +507,14 @@ if __name__ == "__main__":
         "--early_stopping",
         action="store_true",
         help="Use this flag to enable early stopping",
+    )
+
+    parser.add_argument(
+        "-est",
+        "--early_stopping_tolerance",
+        help="Tolerance before early stop kicks in",
+        default=DEFAULT_EARLY_STOP_TOLERANCE,
+        type=int,
     )
 
     parser.add_argument(
@@ -569,6 +587,7 @@ if __name__ == "__main__":
         output_label=args.OUTPUT_LABEL,
         validation=args.validation,
         early_stop=args.early_stopping,
+        early_stop_tolerance=args.early_stopping_tolerance,
         nb_epoch=args.epochs,
         learning_rate=args.learning_rate,
         batch_size=args.batch_size,

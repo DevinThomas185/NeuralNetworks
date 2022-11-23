@@ -111,7 +111,6 @@ if __name__ == "__main__":
     if args.neurons is not None:
         neurons = []
         current = []
-        print(args.neurons)
         for n in args.neurons:
             if n != ":":
                 current.append(int(n))
@@ -119,7 +118,6 @@ if __name__ == "__main__":
                 neurons.append(current)
                 current = []
         neurons.append(current)
-        print(neurons)
 
         params["neurons"] = neurons
 

@@ -232,6 +232,7 @@ class Regressor:
                 if i == 0:
                     min_val_loss = validation_loss
 
+            print(i)
             if self.__plot_loss:
                 if self.__validation:
                     print(
@@ -467,16 +468,6 @@ def _run_neural_net(
     # Error
     error_test = math.sqrt(regressor.score(X_test, y_test))
     print("Test Regressor error: {}".format(error_test))
-
-    # params = {
-    #     'batch_size': [100, 1000],
-    #     'dropout': [None, 0.1, 0.5, 0.8],
-    #     'early_stop': [True, False],
-    #     'learning_rate': [0.01, 0.1],
-    #     'neurons': [[10], [13], [5, 5]],
-    # }
-
-    # RegressorHyperParameterSearch(params)
 
 
 if __name__ == "__main__":

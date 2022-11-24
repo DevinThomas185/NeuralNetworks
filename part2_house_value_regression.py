@@ -14,7 +14,7 @@ DEFAULT_EPOCHS = 100
 DEFAULT_LEARNING_RATE = 0.01
 DEFAULT_NEURONS = [5, 5]
 DEFAULT_BATCH_SIZE = 100
-DEFAULT_EARLY_STOP_TOLERANCE = 10
+DEFAULT_EARLY_STOP_TOLERANCE = 5
 
 
 class Regressor:
@@ -25,6 +25,7 @@ class Regressor:
         early_stop=False,
         early_stop_tolerance=DEFAULT_EARLY_STOP_TOLERANCE,
         dropout=None,
+        regularisation=False,
         nb_epoch=DEFAULT_EPOCHS,
         learning_rate=DEFAULT_LEARNING_RATE,
         neurons=DEFAULT_NEURONS,
@@ -51,6 +52,7 @@ class Regressor:
         self.early_stop = early_stop
         self.early_stop_tolerance = early_stop_tolerance
         self.dropout = dropout
+        self.regularisation = regularisation
 
         self.__x = x
         self.__loss_function = nn.MSELoss()
@@ -68,7 +70,7 @@ class Regressor:
 
         # Preprocessing specific values
         self.__training_columns = None
-        self.__label_replace = None
+        self.__ocean_proximity_mode_category = None
         self.__x_imputer = impute.SimpleImputer(missing_values=np.nan, strategy="mean")
         self.__x_scaling = preprocessing.MinMaxScaler()
 
@@ -81,6 +83,7 @@ class Regressor:
 
         model = []
         n_input = self.input_size
+        # Allows for tweaking the number and type of hidden layers.
         for layer in neurons:
             model.append(nn.Linear(n_input, layer))
             if self.dropout is not None:
@@ -89,6 +92,8 @@ class Regressor:
         model.append(nn.Linear(n_input, self.output_size))
         model.append(nn.ReLU())  # Ensure that no negative house prices are predicted
 
+        # Initialise weights of the model using Xavier Glorot
+        # Initialise bias of each layer to 0.
         for layer in model:
             if type(layer) == nn.Linear:
                 nn.init.xavier_uniform_(layer.weight)
@@ -117,27 +122,34 @@ class Regressor:
         """
 
         if training:
-            self.__label_replace = x["ocean_proximity"].mode()[0]
+            # Find out what is the mode of the 'ocean_proximity' feature categories
+            # and store it for future filling in of the gaps in the dataframe.
+            self.__ocean_proximity_mode_category = x["ocean_proximity"].mode()[0]
 
-        # Transform the ocean_proximity column into the one-hot encoded columns.
+        # Fill in the empty cells in the ocean_proximity column.
         pd.options.mode.chained_assignment = None  # Disable pandas unnecessary warning
         x["ocean_proximity"] = x.loc[:, ["ocean_proximity"]].fillna(
-            value=self.__label_replace
+            value=self.__ocean_proximity_mode_category
         )
+
+        # Transform the ocean_proximity column into the one-hot encoded columns.
         new_columns = pd.get_dummies(x["ocean_proximity"])
         x = x.drop("ocean_proximity", axis=1).join(new_columns)
 
-        # Putting the columns correct for the test dataset, or setting them for the training
         if training:
             self.__training_columns = x.columns
         else:
+            # Putting the columns in the correct correct order for the test dataset.
             x = x.reindex(columns=self.__training_columns, fill_value=0)
 
         if training:
             self.__x_imputer.fit(x)
 
         x = self.__x_imputer.transform(x)
+
         if training:
+            # Fit the x scaler to be able to apply normalisation to the
+            # continuous input features.
             self.__x_scaling.fit(x)
 
         # Set X and Y types
@@ -203,19 +215,6 @@ class Regressor:
                 # Forward
                 Y_Pred = self.__network(data)
 
-                """print(
-                    "Batch:\t",
-                    j,
-                    "\t\t",
-                    "Data:\t",
-                    int(data_y.mean().item()),
-                    "\t\t",
-                    "Prediction:\t",
-                    int(Y_Pred.mean().item()),
-                    "\t\t",
-                    "Delta:\t",
-                    int(data_y.mean().item()) - int(Y_Pred.mean().item()),
-                )"""
                 # Loss
                 loss = self.__loss_function(Y_Pred, data_y)
 
@@ -229,7 +228,7 @@ class Regressor:
 
             last_loss = running_loss / len(trainloader)
 
-            # Early stop depending on if validation loss increases
+            validation_loss = 0
             if self.__validation:
                 validation_loss = self.score(validation_x, validation_y)
                 val_loss_by_epoch.append(validation_loss)
@@ -237,26 +236,29 @@ class Regressor:
                 if i == 0:
                     min_val_loss = validation_loss
 
-            print(i)
+            print(f"Epoch {i}/{self.nb_epoch}")
             if self.__plot_loss:
+                train_RMSE = math.sqrt(last_loss)
+                print(f"Train Loss: {last_loss:.4f}, Train RMSE: {train_RMSE:.4f}")
                 if self.__validation:
+                    validation_RMSE = math.sqrt(validation_loss)
                     print(
-                        f"Epoch {i+1}/{self.nb_epoch}, Train Loss: {last_loss:.4f}, Validation Loss: {validation_loss:.4f}"
+                        f"Validation Loss: {validation_loss:.4f}, Validation RMSE: {validation_RMSE:.4f}"
                     )
-                else:
-                    print(f"Epoch {i+1}/{self.nb_epoch}, Train Loss: {last_loss:.4f}")
 
             loss_by_epoch.append(last_loss)
 
             if self.__validation:
                 if validation_loss <= min_val_loss:
+                    # Improvement registered, reset early stop counter
+                    early_stop_count = 0
                     min_val_loss = validation_loss
                 else:
-                    if self.early_stop:
-                        early_stop_count += 1
-                        if early_stop_count >= self.early_stop_tolerance:
-                            break
-                    # pass
+                    early_stop_count += 1
+
+            # Early stop if validation loss doesn't decrease for a number of epochs.
+            if self.early_stop and early_stop_count >= self.early_stop_tolerance:
+                break
 
         self.x_axis = range(1, i + 2)
         self.y_axis = loss_by_epoch
@@ -432,6 +434,7 @@ def _run_neural_net(
     learning_rate,
     batch_size,
     dropout,
+    regularisation,
     neurons,
     plot_loss,
     seed,
@@ -460,6 +463,7 @@ def _run_neural_net(
         learning_rate=learning_rate,
         batch_size=batch_size,
         dropout=dropout,
+        regularisation=regularisation,
         neurons=neurons,
     )
 
@@ -473,7 +477,7 @@ def _run_neural_net(
     if save:
         save_regressor(regressor)
 
-    print("Optimal Epochs:", get_elbow_value(regressor))
+    print("Elbow Epoch:", get_elbow_value(regressor))
 
     # Error
     error_test = math.sqrt(regressor.score(X_test, y_test))
@@ -548,6 +552,12 @@ if __name__ == "__main__":
         default=None,
         type=float,
     )
+    parser.add_argument(
+        "-r",
+        "--regularisation",
+        action="store_true",
+        help="Enable the L2 regularistation applied to the weights of the model",
+    )
 
     parser.add_argument(
         "-n",
@@ -580,6 +590,7 @@ if __name__ == "__main__":
         help="Save the resulting model to pickle file",
     )
 
+
     args = parser.parse_args(sys.argv[1:])
 
     _run_neural_net(
@@ -592,6 +603,7 @@ if __name__ == "__main__":
         learning_rate=args.learning_rate,
         batch_size=args.batch_size,
         dropout=args.dropout,
+        regularisation=args.regularisation,
         neurons=list(args.neurons),
         plot_loss=args.plot_loss,
         seed=args.seed,

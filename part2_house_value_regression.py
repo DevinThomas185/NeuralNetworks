@@ -15,7 +15,8 @@ DEFAULT_LEARNING_RATE = 0.01
 DEFAULT_NEURONS = [5, 5]
 DEFAULT_BATCH_SIZE = 100
 DEFAULT_EARLY_STOP_TOLERANCE = 5
-
+DEFAULT_WEIGHT_DECAY = 1e-4
+DEFAULT_IGNORED_FEATURES = []
 
 class Regressor:
     def __init__(
@@ -31,6 +32,7 @@ class Regressor:
         neurons=DEFAULT_NEURONS,
         batch_size=DEFAULT_BATCH_SIZE,
         plot_loss=False,
+        ignored_features=DEFAULT_IGNORED_FEATURES,
     ):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
@@ -51,8 +53,12 @@ class Regressor:
         self.neurons = neurons
         self.early_stop = early_stop
         self.early_stop_tolerance = early_stop_tolerance
+        self.ignored_features = ignored_features
         self.dropout = dropout
-        self.regularisation = regularisation
+        if regularisation:
+            self.weight_decay = DEFAULT_WEIGHT_DECAY
+        else:
+            self.weight_decay = 0
 
         self.__x = x
         self.__loss_function = nn.MSELoss()
@@ -72,7 +78,7 @@ class Regressor:
         self.__training_columns = None
         self.__ocean_proximity_mode_category = None
         self.__x_imputer = impute.SimpleImputer(missing_values=np.nan, strategy="mean")
-        self.__x_scaling = preprocessing.MinMaxScaler()
+        self.__x_scaling = preprocessing.StandardScaler()
 
         # Initialise preprocesor values
         X, _ = self._preprocessor(x, training=True)
@@ -131,6 +137,10 @@ class Regressor:
         x["ocean_proximity"] = x.loc[:, ["ocean_proximity"]].fillna(
             value=self.__ocean_proximity_mode_category
         )
+
+        # Drop the ignored features.
+        for ignored_feature in self.ignored_features:
+            x = x.drop(ignored_feature, axis=1)
 
         # Transform the ocean_proximity column into the one-hot encoded columns.
         new_columns = pd.get_dummies(x["ocean_proximity"])
@@ -194,7 +204,7 @@ class Regressor:
         loss_by_epoch = []
         val_loss_by_epoch = []
 
-        optimiser = T.optim.Adam(self.__network.parameters(), lr=self.learning_rate)
+        optimiser = T.optim.Adam(self.__network.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
 
         min_val_loss = 0
 

@@ -51,6 +51,8 @@ optional arguments:
   -cv, --validation     Use this flag to turn on cross validation
   -es, --early_stopping
                         Use this flag to enable early stopping
+  -est EARLY_STOPPING_TOLERANCE, --early_stopping_tolerance EARLY_STOPPING_TOLERANCE
+                        Tolerance before early stop kicks in
   -e EPOCHS, --epochs EPOCHS
                         The number of epochs to run the training for
   -lr LEARNING_RATE, --learning_rate LEARNING_RATE
@@ -68,13 +70,14 @@ optional arguments:
 ### Example Use
 You can run:
 ```
-python3 part2_house_value_regression.py housing.csv median_house_value -cv -es -e 100 -lr 0.01 -b 100 -d 0.1  -n 5 5 -p -x 123 -s
+python3 part2_house_value_regression.py housing.csv median_house_value -cv -es -est 200 -e 100 -lr 0.01 -b 100 -d 0.1  -n 5 5 -p -x 123 -s
 ```
 Explanation:
 - ```housing.csv``` run the regression neural network on **housing.csv** dataset
 - ```median_house_value``` the label for output feature
 - ```-cv``` enable cross-validation
 - ```-es``` enable early stopping
+- ```-est 200``` set early stopping tolerance to 200
 - ```-e 100``` set epochs to 100
 - ```-lr 0.01``` set learning rate to 0.01
 - ```-b 100``` set batch-size to 100
@@ -103,6 +106,8 @@ optional arguments:
   -h, --help            show this help message and exit
   -es, --early_stopping
                         Use this flag to enable early stopping
+  -est, EARLY_STOPPING_TOLERANCE, --early_stopping_tolerance EARLY_STOPPING_TOLERANCE
+                        Tolerence before early stop kicks in
   -e EPOCHS, --epochs EPOCHS
                         The number of epochs to run the training for
   -lr LEARNING_RATE [LEARNING_RATE ...], --learning_rate LEARNING_RATE [LEARNING_RATE ...]
@@ -121,12 +126,13 @@ optional arguments:
 ### Example Use
 You can run:
 ```
-python3 hyperparameter_tuning.py housing.csv median_house_value -es -e 10 -lr 0.01 0.1 -b 100 -d 0.1 0.9 -n 5 5 : 10 10
+python3 hyperparameter_tuning.py housing.csv median_house_value -es -est 200 -e 10 -lr 0.01 0.1 -b 100 -d 0.1 0.9 -n 5 5 : 10 10
 ```
 Explanation:
 - ```housing.csv``` run the regression neural network on **housing.csv** dataset
 - ```median_house_value``` the label for output feature
 - ```-es``` enable early stopping
+- ```-est``` set early stopping tolerance to 200
 - ```-e 10``` set epochs to 10
 - ```-lr 0.01 0.1``` set learning rate to [0.01, 0.1]
 - ```-b 100``` set batch-size to 100

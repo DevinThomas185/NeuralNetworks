@@ -10,13 +10,12 @@ from sklearn import preprocessing, impute
 import sys
 from argparse import ArgumentParser
 
-DEFAULT_EPOCHS = 100
-DEFAULT_LEARNING_RATE = 0.01
-DEFAULT_NEURONS = [5, 5]
-DEFAULT_BATCH_SIZE = 100
+DEFAULT_EPOCHS = 8000
+DEFAULT_LEARNING_RATE = 1e-010
+DEFAULT_NEURONS = [16, 16, 64, 128]
+DEFAULT_BATCH_SIZE = 32
 DEFAULT_EARLY_STOP_TOLERANCE = 5
 DEFAULT_WEIGHT_DECAY = 1e-4
-DEFAULT_IGNORED_FEATURES = []
 
 class Regressor:
     def __init__(
@@ -32,7 +31,6 @@ class Regressor:
         neurons=DEFAULT_NEURONS,
         batch_size=DEFAULT_BATCH_SIZE,
         plot_loss=False,
-        ignored_features=DEFAULT_IGNORED_FEATURES,
     ):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
@@ -53,7 +51,6 @@ class Regressor:
         self.neurons = neurons
         self.early_stop = early_stop
         self.early_stop_tolerance = early_stop_tolerance
-        self.ignored_features = ignored_features
         self.dropout = dropout
         if regularisation:
             self.weight_decay = DEFAULT_WEIGHT_DECAY
@@ -138,10 +135,6 @@ class Regressor:
             value=self.__ocean_proximity_mode_category
         )
 
-        # Drop the ignored features.
-        for ignored_feature in self.ignored_features:
-            x = x.drop(ignored_feature, axis=1)
-
         # Transform the ocean_proximity column into the one-hot encoded columns.
         new_columns = pd.get_dummies(x["ocean_proximity"])
         x = x.drop("ocean_proximity", axis=1).join(new_columns)
@@ -156,13 +149,15 @@ class Regressor:
             self.__x_imputer.fit(x)
 
         x = self.__x_imputer.transform(x)
+        #print(np.isnan(x).any())
+
 
         if training:
             # Fit the x scaler to be able to apply normalisation to the
             # continuous input features.
             self.__x_scaling.fit(x)
 
-        # Set X and Y types
+        # Set X and Y df.isnull().values.any()types
         x = x.astype("float32")
         if y is not None:
             y = y.astype("float32")
@@ -204,7 +199,7 @@ class Regressor:
         loss_by_epoch = []
         val_loss_by_epoch = []
 
-        optimiser = T.optim.Adam(self.__network.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+        optimiser = T.optim.SGD(self.__network.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
 
         min_val_loss = 0
 

@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import math
 from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.metrics import r2_score
 from sklearn import preprocessing, impute
 import sys
 from argparse import ArgumentParser
@@ -309,7 +310,17 @@ class Regressor:
         X, Y = self._preprocessor(x, y=y, training=False)  # Do not forget
         Y_Pred = self.__network(X)
 
-        return self.__loss_function(Y_Pred, Y).item()
+        MSE = self.__loss_function(Y_Pred, Y).item()
+        RMSE = math.sqrt(MSE)
+        R2 = r2_score(Y.detach().numpy(), Y_Pred.detach().numpy())
+
+        print("------ Metrics ------")
+        print(f"MSE: {MSE}")
+        print(f"RMSE: {RMSE}")
+        print(f"R2: {R2}")
+        print("---------------------")
+
+        return MSE
 
     def get_params(self, deep=True):
         return {
@@ -409,7 +420,6 @@ def RegressorHyperParameterSearch(
     print("Elbow Epoch:", get_elbow_value(grid_search.best_estimator_))
 
     error_test = math.sqrt(grid_search.best_estimator_.score(X_test, y_test))
-    print("Test Regressor error: {}".format(error_test))
 
     if save:
         save_regressor(grid_search.best_estimator_)
@@ -477,7 +487,6 @@ def _run_neural_net(
 
     # Error
     error_test = math.sqrt(regressor.score(X_test, y_test))
-    print("Test Regressor error: {}".format(error_test))
 
 
 if __name__ == "__main__":

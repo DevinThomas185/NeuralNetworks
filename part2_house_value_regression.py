@@ -11,10 +11,10 @@ from sklearn import preprocessing, impute
 import sys
 from argparse import ArgumentParser
 
-DEFAULT_EPOCHS = 100
-DEFAULT_LEARNING_RATE = 0.01
-DEFAULT_NEURONS = [5, 5]
-DEFAULT_BATCH_SIZE = 100
+DEFAULT_EPOCHS = 1000
+DEFAULT_LEARNING_RATE = 0.005
+DEFAULT_NEURONS = [16, 16, 16]
+DEFAULT_BATCH_SIZE = 256
 DEFAULT_EARLY_STOP_TOLERANCE = 10
 
 
@@ -71,7 +71,7 @@ class Regressor:
         self.__training_columns = None
         self.__label_replace = None
         self.__x_imputer = impute.SimpleImputer(missing_values=np.nan, strategy="mean")
-        self.__x_scaling = preprocessing.MinMaxScaler()
+        self.__x_scaling = preprocessing.StandardScaler()
 
         # Initialise preprocesor values
         X, _ = self._preprocessor(x, training=True)
@@ -84,6 +84,7 @@ class Regressor:
         n_input = self.input_size
         for layer in neurons:
             model.append(nn.Linear(n_input, layer))
+            model.append(nn.ReLU())
             if self.dropout is not None:
                 model.append(nn.Dropout(self.dropout))
             n_input = layer

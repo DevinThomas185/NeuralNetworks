@@ -11,10 +11,10 @@ from sklearn import preprocessing, impute
 import sys
 from argparse import ArgumentParser
 
-DEFAULT_EPOCHS = 100
-DEFAULT_LEARNING_RATE = 0.01
-DEFAULT_NEURONS = [5, 5]
-DEFAULT_BATCH_SIZE = 100
+DEFAULT_EPOCHS = 2000
+DEFAULT_LEARNING_RATE = 0.005
+DEFAULT_NEURONS = [16, 16, 128]
+DEFAULT_BATCH_SIZE = 256
 DEFAULT_EARLY_STOP_TOLERANCE = 10
 
 
@@ -88,7 +88,6 @@ class Regressor:
                 model.append(nn.Dropout(self.dropout))
             n_input = layer
         model.append(nn.Linear(n_input, self.output_size))
-        model.append(nn.ReLU())  # Ensure that no negative house prices are predicted
 
         for layer in model:
             if type(layer) == nn.Linear:

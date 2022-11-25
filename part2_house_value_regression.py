@@ -204,19 +204,6 @@ class Regressor:
                 # Forward
                 Y_Pred = self.__network(data)
 
-                """print(
-                    "Batch:\t",
-                    j,
-                    "\t\t",
-                    "Data:\t",
-                    int(data_y.mean().item()),
-                    "\t\t",
-                    "Prediction:\t",
-                    int(Y_Pred.mean().item()),
-                    "\t\t",
-                    "Delta:\t",
-                    int(data_y.mean().item()) - int(Y_Pred.mean().item()),
-                )"""
                 # Loss
                 loss = self.__loss_function(Y_Pred, data_y)
 
@@ -230,6 +217,7 @@ class Regressor:
 
             last_loss = running_loss / len(trainloader)
 
+            print(f"Epoch: {i}")
             # Early stop depending on if validation loss increases
             if self.__validation:
                 validation_loss = self.score(validation_x, validation_y)
@@ -238,19 +226,12 @@ class Regressor:
                 if i == 0:
                     min_val_loss = validation_loss
 
-            print(i)
-            if self.__plot_loss:
-                if self.__validation:
-                    print(
-                        f"Epoch {i+1}/{self.nb_epoch}, Train Loss: {last_loss:.4f}, Validation Loss: {validation_loss:.4f}"
-                    )
-                else:
-                    print(f"Epoch {i+1}/{self.nb_epoch}, Train Loss: {last_loss:.4f}")
 
             loss_by_epoch.append(last_loss)
 
             if self.__validation:
                 if validation_loss <= min_val_loss:
+                    early_stop_count = 0
                     min_val_loss = validation_loss
                 else:
                     if self.early_stop:

@@ -11,10 +11,10 @@ from sklearn import preprocessing, impute
 import sys
 from argparse import ArgumentParser
 
-DEFAULT_EPOCHS = 100
-DEFAULT_LEARNING_RATE = 0.01
-DEFAULT_NEURONS = [5, 5]
-DEFAULT_BATCH_SIZE = 100
+DEFAULT_EPOCHS = 1000
+DEFAULT_LEARNING_RATE = 0.005
+DEFAULT_NEURONS = [16, 16, 16]
+DEFAULT_BATCH_SIZE = 256
 DEFAULT_EARLY_STOP_TOLERANCE = 10
 
 
@@ -71,7 +71,7 @@ class Regressor:
         self.__training_columns = None
         self.__label_replace = None
         self.__x_imputer = impute.SimpleImputer(missing_values=np.nan, strategy="mean")
-        self.__x_scaling = preprocessing.MinMaxScaler()
+        self.__x_scaling = preprocessing.StandardScaler()
 
         # Initialise preprocesor values
         X, _ = self._preprocessor(x, training=True)
@@ -84,6 +84,7 @@ class Regressor:
         n_input = self.input_size
         for layer in neurons:
             model.append(nn.Linear(n_input, layer))
+            model.append(nn.ReLU())
             if self.dropout is not None:
                 model.append(nn.Dropout(self.dropout))
             n_input = layer
@@ -204,19 +205,6 @@ class Regressor:
                 # Forward
                 Y_Pred = self.__network(data)
 
-                """print(
-                    "Batch:\t",
-                    j,
-                    "\t\t",
-                    "Data:\t",
-                    int(data_y.mean().item()),
-                    "\t\t",
-                    "Prediction:\t",
-                    int(Y_Pred.mean().item()),
-                    "\t\t",
-                    "Delta:\t",
-                    int(data_y.mean().item()) - int(Y_Pred.mean().item()),
-                )"""
                 # Loss
                 loss = self.__loss_function(Y_Pred, data_y)
 
@@ -230,6 +218,7 @@ class Regressor:
 
             last_loss = running_loss / len(trainloader)
 
+            print(f"Epoch: {i}")
             # Early stop depending on if validation loss increases
             if self.__validation:
                 validation_loss = self.score(validation_x, validation_y)
@@ -238,19 +227,12 @@ class Regressor:
                 if i == 0:
                     min_val_loss = validation_loss
 
-            print(i)
-            if self.__plot_loss:
-                if self.__validation:
-                    print(
-                        f"Epoch {i+1}/{self.nb_epoch}, Train Loss: {last_loss:.4f}, Validation Loss: {validation_loss:.4f}"
-                    )
-                else:
-                    print(f"Epoch {i+1}/{self.nb_epoch}, Train Loss: {last_loss:.4f}")
 
             loss_by_epoch.append(last_loss)
 
             if self.__validation:
                 if validation_loss <= min_val_loss:
+                    early_stop_count = 0
                     min_val_loss = validation_loss
                 else:
                     if self.early_stop:

@@ -26,6 +26,15 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "-est",
+        "--early_stop_tolerance",
+        nargs="+",
+        help="Use this flag to enable early stopping tolerances",
+        default=None,
+        type=str,
+    )
+
+    parser.add_argument(
         "-e",
         "--epochs",
         help="The number of epochs to run the training for",
@@ -107,6 +116,9 @@ if __name__ == "__main__":
 
     if args.learning_rate is not None:
         params["learning_rate"] = args.learning_rate
+
+    if args.early_stop_tolerance is not None:
+        params["early_stop_tolerance"] = args.early_stop_tolerance
 
     if args.neurons is not None:
         neurons = []

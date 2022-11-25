@@ -4,7 +4,7 @@ This repository contains:
 1. An implementation of a neural network [mini-library](part1_nn_lib.py).
 2. A complete [regression neural network](part2_house_value_regression.py) trained on the "1990 California Housing" dataset.
 
-This coursework was part of **COMP70050 - Introduction to Machine Learning (Autumn 2022)**, according to [specification](Specifcation.pdf).
+This coursework was part of **COMP70050 - Introduction to Machine Learning (Autumn 2022)**, according to [specification](Specification.pdf).
 
 ----
 
